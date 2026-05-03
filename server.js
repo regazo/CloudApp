@@ -22,17 +22,14 @@ db = client.db("cloud");
 
 console.log("db conected...");
 
-// login + make user
+// login
 app.post("/login", async (req,res)=>{
   const { uid, email } = req.body;
 
   let user = await db.collection("users").findOne({_id:uid});
 
   if(!user){
-    await db.collection("users").insertOne({
-      _id: uid,
-      email: email
-    });
+    await db.collection("users").insertOne({_id:uid,email});
 
     await db.collection("directories").insertOne({
       _id: "root-"+uid,
@@ -46,7 +43,7 @@ app.post("/login", async (req,res)=>{
   res.send("ok");
 });
 
-// create folder
+// mkdir
 app.post("/mkdir", async (req,res)=>{
   const {userId,name,path} = req.body;
 
@@ -61,7 +58,7 @@ app.post("/mkdir", async (req,res)=>{
   res.send("dir made");
 });
 
-// delete folder
+// rmdir
 app.post("/rmdir", async (req,res)=>{
   const {path} = req.body;
 
@@ -76,7 +73,7 @@ app.post("/rmdir", async (req,res)=>{
   res.send("deleted");
 });
 
-// upload file
+// upload
 app.post("/upload", upload.single("file"), async (req,res)=>{
   const { userId, path } = req.body;
   const file = req.file;
@@ -94,10 +91,26 @@ app.post("/upload", upload.single("file"), async (req,res)=>{
   res.send("uploaded");
 });
 
-// delete file
+// deletes file
 app.post("/delete-file", async (req,res)=>{
   await db.collection("files").deleteOne({_id:req.body.id});
   res.send("deleted");
+});
+
+// detects duplicates
+app.post("/duplicates", async (req,res)=>{
+  const files = await db.collection("files").find(req.body).toArray();
+
+  let map = {};
+
+  files.forEach(f=>{
+    if(!map[f.hash]) map[f.hash] = [];
+    map[f.hash].push(f);
+  });
+
+  const dupes = Object.values(map).filter(x => x.length > 1);
+
+  res.json(dupes);
 });
 
 app.listen(3000, () => console.log("server running"));
