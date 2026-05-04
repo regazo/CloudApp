@@ -3,13 +3,21 @@ async function uploadFile(){
     const fileInput = document.getElementById('fileInput')
     const file = fileInput.files[0]
 
+    const user = localStorage.getItem('user')
+
     if(!file){
         setMsg('no file')
         return
     }
 
+    if(!user){
+        setMsg('login first')
+        return
+    }
+
     const formData = new FormData()
     formData.append('file', file)
+    formData.append('user', user) // send user
 
     const res = await fetch('/upload',{
         method:'POST',
@@ -22,9 +30,16 @@ async function uploadFile(){
     loadFiles()
 }
 
-// get files
+// load files for user
 async function loadFiles(){
-    const res = await fetch('/files')
+    const user = localStorage.getItem('user')
+
+    if(!user){
+        setMsg('not loged in')
+        return
+    }
+
+    const res = await fetch('/files?user=' + user)
     const files = await res.json()
 
     const div = document.getElementById('files')
@@ -37,17 +52,17 @@ async function loadFiles(){
     })
 }
 
-// delete file
+// delete
 async function del(name){
     await fetch('/delete/'+name,{method:'DELETE'})
     setMsg('deleted')
     loadFiles()
 }
 
-// login user (real now)
+// login
 async function login(){
-    const username = prompt('enter user')
-    const password = prompt('enter pass')
+    const username = prompt('user')
+    const password = prompt('pass')
 
     const res = await fetch('/login',{
         method:'POST',
@@ -59,11 +74,11 @@ async function login(){
     setMsg(data.msg)
 
     if(data.msg === 'login ok'){
-        localStorage.setItem('user',username) // save user
+        localStorage.setItem('user',username)
     }
 }
 
-// register user
+// register
 async function register(){
     const username = prompt('new user')
     const password = prompt('new pass')
@@ -84,13 +99,13 @@ function logout(){
     setMsg('logged out')
 }
 
-// fake folder (not saved yet)
+// folder (still basic)
 function makeFolder(){
     const name = document.getElementById('folderName').value
-    setMsg('folder "'+name+'" made')
+    setMsg('folder made: '+name)
 }
 
-// msg helper (just prints text)
+// message
 function setMsg(text){
     document.getElementById('msg').innerText = text
 }
