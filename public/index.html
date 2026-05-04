@@ -8,43 +8,92 @@
             font-family: Arial;
             background: linear-gradient(135deg,#070513,#1a1229);
             color:white;
-            text-align:center;
+            margin:0;
+
+            height:100vh;
+            display:flex;
+            justify-content:center;
+            align-items:center;
         }
 
         .box{
             background:#1f1b2e;
-            padding:25px;
-            margin:60px auto;
-            width:420px;
+            padding:30px;
+            width:520px;
             border-radius:12px;
-            box-shadow:0 0 20px rgba(0,0,0,0.5);
+            box-shadow:0 0 25px rgba(0,0,0,0.5);
+
+            text-align:center; /* ✅ centers content */
+        }
+
+        h1{
+            margin-bottom:20px;
+        }
+
+        .section{
+            margin-bottom:20px;
+        }
+
+        .row{
+            display:flex;
+            justify-content:center; /* ✅ center row content */
+            gap:10px;
+            align-items:center;
         }
 
         button{
-            margin:5px;
-            padding:6px 12px;
+            padding:7px 14px;
             border:none;
             border-radius:6px;
             background:#6c5ce7;
             color:white;
             cursor:pointer;
+            min-width:90px;
+        }
+
+        button:hover{
+            background:#5a4bd1;
         }
 
         input{
-            margin:5px;
-            padding:6px;
+            width:250px; /* ✅ prevents stretching */
+            padding:7px;
             border-radius:6px;
             border:none;
         }
 
-        #files{
-            margin-top:15px;
-            text-align:left;
+        .topbar{
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            gap:10px;
+            margin-bottom:20px;
+        }
+
+        .buttons{
+            display:flex;
+            gap:10px;
         }
 
         .msg{
-            margin-top:10px;
             color:#00ffcc;
+            font-size:14px;
+        }
+
+        #files{
+            margin-top:15px;
+        }
+
+        #files div{
+            background:#2b2540;
+            padding:10px;
+            border-radius:6px;
+            margin-bottom:8px;
+            text-align:center;
+        }
+
+        small{
+            color:#aaa;
         }
     </style>
 </head>
@@ -52,29 +101,44 @@
 <body>
 
 <div class="box">
-    <h2>cloud storage</h2>
 
-    <button onclick="login()">login</button>
-    <button onclick="register()">register</button>
-    <button onclick="logout()">logout</button>
+    <h1>Cloud Storage</h1>
 
-    <br><br>
+    <!-- Status + Buttons -->
+    <div class="topbar">
+        <div id="msg" class="msg"></div>
 
-    <input id="folderName" placeholder="folder name">
-    <button onclick="makeFolder()">make folder</button>
+        <div class="buttons">
+            <button onclick="login()">login</button>
+            <button onclick="register()">register</button>
+            <button onclick="logout()">logout</button>
+        </div>
+    </div>
 
-    <br><br>
+    <!-- Folder -->
+    <div class="section">
+        <div class="row">
+            <input id="folderName" placeholder="new folder">
+            <button onclick="makeFolder()">create</button>
+        </div>
+    </div>
 
-    <input type="file" id="fileInput">
-    <button onclick="uploadFile()">upload</button>
+    <!-- Upload -->
+    <div class="section">
+        <div class="row">
+            <input type="file" id="fileInput">
+            <button onclick="uploadFile()">upload</button>
+        </div>
+    </div>
 
-    <br><br>
+    <!-- Refresh -->
+    <div class="section">
+        <button onclick="loadFiles()">refresh files</button>
+    </div>
 
-    <button onclick="loadFiles()">refresh files</button>
-
-    <div id="msg" class="msg"></div>
-
+    <!-- Files -->
     <div id="files"></div>
+
 </div>
 
 <script src="app.js"></script>
