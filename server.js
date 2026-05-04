@@ -1,116 +1,111 @@
-//zakarea erezzaghi 3074880
-import express from "express";
-import { MongoClient } from "mongodb";
-import dotenv from "dotenv";
-import { v4 as uuidv4 } from "uuid";
-import multer from "multer";
-import crypto from "crypto";
+const express = require('express')
+const mongoose = require('mongoose')
+const multer = require('multer')
+const path = require('path')
+const fs = require('fs')
 
-dotenv.config();
+const app = express()
+app.use(express.json())
 
-const app = express();
-app.use(express.json());
+// connect db (might fail if uri wrong btw)
+mongoose.connect('mongodb://127.0.0.1:27017/cloudapp')
+.then(()=> console.log('db conected..'))
+.catch(err=> console.log(err))
 
-const upload = multer({ storage: multer.memoryStorage() });
+// user schema (basic for now)
+const User = mongoose.model('User', {
+    username: String,
+    password: String
+})
 
-const client = new MongoClient(process.env.MONGO_URI);
-let db;
+// file storage setup
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/')
+    },
+    filename: (req, file, cb) => {
+        cb(null, Date.now() + '-' + file.originalname) // random name
+    }
+})
 
-// connect db
-await client.connect();
-db = client.db("cloud");
+const upload = multer({ storage: storage })
 
-console.log("db conected...");
+// serve frontend files (this fixes ur issue)
+app.use(express.static(path.join(__dirname, 'public')))
 
-// login
-app.post("/login", async (req,res)=>{
-  const { uid, email } = req.body;
+// home route (just in case)
+app.get('/', (req,res)=>{
+    res.sendFile(path.join(__dirname,'public','index.html'))
+})
 
-  let user = await db.collection("users").findOne({_id:uid});
+// register user
+app.post('/register', async (req,res)=>{
+    try{
+        const {username, password} = req.body
 
-  if(!user){
-    await db.collection("users").insertOne({_id:uid,email});
+        const exist = await User.findOne({username})
+        if(exist){
+            return res.json({msg:'user alredy exists'})
+        }
 
-    await db.collection("directories").insertOne({
-      _id: "root-"+uid,
-      userId: uid,
-      name: "/",
-      path: "/",
-      parent: null
-    });
-  }
+        const user = new User({username, password})
+        await user.save()
 
-  res.send("ok");
-});
+        res.json({msg:'user created'})
+    }catch(err){
+        res.json({msg:'error'})
+    }
+})
 
-// mkdir
-app.post("/mkdir", async (req,res)=>{
-  const {userId,name,path} = req.body;
+// login user
+app.post('/login', async (req,res)=>{
+    const {username, password} = req.body
 
-  await db.collection("directories").insertOne({
-    _id:uuidv4(),
-    userId,
-    name,
-    path:path+name+"/",
-    parent:path
-  });
+    const user = await User.findOne({username, password})
 
-  res.send("dir made");
-});
+    if(!user){
+        return res.json({msg:'invlaid login'})
+    }
 
-// rmdir
-app.post("/rmdir", async (req,res)=>{
-  const {path} = req.body;
+    res.json({msg:'login ok'})
+})
 
-  const f = await db.collection("files").findOne({path});
-  const d = await db.collection("directories").findOne({parent:path});
+// upload file
+app.post('/upload', upload.single('file'), (req,res)=>{
+    if(!req.file){
+        return res.json({msg:'no file'})
+    }
 
-  if(f || d){
-    return res.send("not empty");
-  }
+    // very basic duplicate check (not perfect tbh)
+    const files = fs.readdirSync('uploads')
+    const same = files.filter(f => f.includes(req.file.originalname))
 
-  await db.collection("directories").deleteOne({path});
-  res.send("deleted");
-});
+    if(same.length > 1){
+        return res.json({msg:'duplicate file maybe'})
+    }
 
-// upload
-app.post("/upload", upload.single("file"), async (req,res)=>{
-  const { userId, path } = req.body;
-  const file = req.file;
+    res.json({msg:'file uploaded'})
+})
 
-  const hash = crypto.createHash("md5").update(file.buffer).digest("hex");
+// get files
+app.get('/files', (req,res)=>{
+    const files = fs.readdirSync('uploads')
+    res.json(files)
+})
 
-  await db.collection("files").insertOne({
-    _id: uuidv4(),
-    userId,
-    filename: file.originalname,
-    path,
-    hash
-  });
+// delete file
+app.delete('/delete/:name', (req,res)=>{
+    const filePath = path.join(__dirname, 'uploads', req.params.name)
 
-  res.send("uploaded");
-});
+    if(fs.existsSync(filePath)){
+        fs.unlinkSync(filePath)
+        return res.json({msg:'deleted'})
+    }
 
-// deletes file
-app.post("/delete-file", async (req,res)=>{
-  await db.collection("files").deleteOne({_id:req.body.id});
-  res.send("deleted");
-});
+    res.json({msg:'not found'})
+})
 
-// detects duplicates
-app.post("/duplicates", async (req,res)=>{
-  const files = await db.collection("files").find(req.body).toArray();
-
-  let map = {};
-
-  files.forEach(f=>{
-    if(!map[f.hash]) map[f.hash] = [];
-    map[f.hash].push(f);
-  });
-
-  const dupes = Object.values(map).filter(x => x.length > 1);
-
-  res.json(dupes);
-});
-
-app.listen(3000, () => console.log("server running"));
+// start server
+app.listen(3000, ()=>{
+    console.log('server running')
+})
