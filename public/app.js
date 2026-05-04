@@ -44,7 +44,6 @@ function updateUI(){
     }
 }
 
-// create folder
 async function makeFolder(){
     const name = document.getElementById("folderName").value
 
@@ -57,7 +56,6 @@ async function makeFolder(){
     loadFiles()
 }
 
-// upload
 async function uploadFile(){
     const file = document.getElementById("fileInput").files[0]
 
@@ -73,6 +71,13 @@ async function uploadFile(){
     loadFiles()
 }
 
+// format size
+function formatSize(bytes){
+    if(bytes < 1024) return bytes + " B"
+    if(bytes < 1024*1024) return (bytes/1024).toFixed(1) + " KB"
+    return (bytes/(1024*1024)).toFixed(1) + " MB"
+}
+
 // load files
 async function loadFiles(){
     const res = await fetch("/files?folder=" + currentFolder)
@@ -81,7 +86,6 @@ async function loadFiles(){
     const div = document.getElementById("files")
     div.innerHTML = ""
 
-    // back button
     if(currentFolder){
         const back = document.createElement("div")
         back.innerHTML = `<button onclick="goBack()">⬅ back</button>`
@@ -91,36 +95,41 @@ async function loadFiles(){
     items.forEach(i=>{
         const el = document.createElement("div")
 
+        const date = new Date(i.date).toLocaleString()
+
         if(i.isFolder){
-            el.innerHTML = `📁 ${i.name} 
-            <button onclick="openFolder('${i.name}')">open</button>`
+            el.innerHTML = `
+            📁 ${i.name} 
+            <button onclick="openFolder('${i.name}')">open</button>
+            `
         }else{
-            el.innerHTML = `📄 ${i.name} 
+            el.innerHTML = `
+            📄 ${i.name} (${formatSize(i.size)})
+            <br><small>${date}</small>
+            <br>
             <button onclick="downloadFile('${i.name}')">download</button>
-            <button onclick="deleteFile('${i.name}')">delete</button>`
+            <button onclick="deleteFile('${i.name}')">delete</button>
+            `
         }
 
         div.appendChild(el)
     })
 }
 
-// open folder
 function openFolder(name){
     currentFolder = currentFolder ? currentFolder + "/" + name : name
     loadFiles()
     updateUI()
 }
 
-// go back
 function goBack(){
     const parts = currentFolder.split("/")
     parts.pop()
-    currentFolder = parts.join("/")
+    currentFolder = parts.join("")
     loadFiles()
     updateUI()
 }
 
-// delete
 async function deleteFile(name){
     await fetch("/delete/" + name + "?folder=" + currentFolder, {
         method:"DELETE"
@@ -129,7 +138,6 @@ async function deleteFile(name){
     loadFiles()
 }
 
-// download
 function downloadFile(name){
     window.open("/download/" + name + "?folder=" + currentFolder)
 }

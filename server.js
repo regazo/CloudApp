@@ -13,7 +13,6 @@ app.use(express.static("public"))
 
 const upload = multer({ dest: "uploads/" })
 
-// ensure uploads exists
 if (!fs.existsSync("uploads")) {
     fs.mkdirSync("uploads")
 }
@@ -21,7 +20,6 @@ if (!fs.existsSync("uploads")) {
 // create folder
 app.post("/mkdir", (req,res)=>{
     const { name } = req.body
-
     const dir = path.join("uploads", name)
 
     if(!fs.existsSync(dir)){
@@ -32,7 +30,7 @@ app.post("/mkdir", (req,res)=>{
     res.json({msg:"folder exists"})
 })
 
-// upload into folder
+// upload
 app.post("/upload", upload.single("file"), (req,res)=>{
     const folder = req.body.folder || ""
     const file = req.file
@@ -44,17 +42,24 @@ app.post("/upload", upload.single("file"), (req,res)=>{
     res.json({msg:"uploaded"})
 })
 
-// list files + folders
+// Files with metadaata
 app.get("/files", (req,res)=>{
     const folder = req.query.folder || ""
     const dirPath = path.join("uploads", folder)
 
     const items = fs.readdirSync(dirPath, { withFileTypes: true })
 
-    const result = items.map(i => ({
-        name: i.name,
-        isFolder: i.isDirectory()
-    }))
+    const result = items.map(i=>{
+        const fullPath = path.join(dirPath, i.name)
+        const stats = fs.statSync(fullPath)
+
+        return {
+            name: i.name,
+            isFolder: i.isDirectory(),
+            size: stats.size,
+            date: stats.mtime
+        }
+    })
 
     res.json(result)
 })
