@@ -125,7 +125,7 @@ function openFolder(name){
 function goBack(){
     const parts = currentFolder.split("/")
     parts.pop()
-    currentFolder = parts.join("")
+    currentFolder = parts.join("/")
     loadFiles()
     updateUI()
 }
