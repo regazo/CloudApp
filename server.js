@@ -1,8 +1,8 @@
-//zakarea erezzaghi 3074880
 import express from "express"
 import multer from "multer"
 import fs from "fs"
 import path from "path"
+import mongoose from "mongoose"
 import { fileURLToPath } from "url"
 
 const __filename = fileURLToPath(import.meta.url)
@@ -14,142 +14,87 @@ app.use(express.static("public"))
 
 const upload = multer({ dest: "uploads/" })
 
-// make uploads folder
-if (!fs.existsSync("uploads")) {
-    fs.mkdirSync("uploads")
+mongoose.connect("mongodb://zmbame11_db_user:11223344@ac-07nbr9g-shard-00-00.wzyfr0z.mongodb.net:27017,ac-07nbr9g-shard-00-01.wzyfr0z.mongodb.net:27017,ac-07nbr9g-shard-00-02.wzyfr0z.mongodb.net:27017/cloudapp?ssl=true&replicaSet=atlas-2ad74z-shard-0&authSource=admin&retryWrites=true&w=majority")
+.then(()=>console.log("mongo connected"))
+.catch(err=>console.log(err))
+
+const User = mongoose.model("User", new mongoose.Schema({ uid:String }))
+
+if (!fs.existsSync("uploads")) fs.mkdirSync("uploads")
+
+function userDir(user){
+    return path.join("uploads", user)
 }
 
-// ===== USERS =====
-const usersFile = "users.json"
-
-if (!fs.existsSync(usersFile)) {
-    fs.writeFileSync(usersFile, JSON.stringify([]))
-}
-
-// register
-app.post("/register", (req,res)=>{
-    const { username, password } = req.body
-
-    if(!username || !password){
-        return res.json({msg:"missing fields"})
-    }
-
-    const users = JSON.parse(fs.readFileSync(usersFile))
-
-    if(users.find(u=>u.username===username)){
-        return res.json({msg:"user exists"})
-    }
-
-    users.push({username,password})
-    fs.writeFileSync(usersFile, JSON.stringify(users))
-
-    res.json({msg:"registered"})
+app.post("/user", async (req,res)=>{
+    const { uid } = req.body
+    let u = await User.findOne({ uid })
+    if(!u) await new User({uid}).save()
+    res.json({msg:"ok"})
 })
 
-// login
-app.post("/login", (req,res)=>{
-    const { username, password } = req.body
+app.get("/files",(req,res)=>{
+    const { user } = req.query
+    const dir = userDir(user)
 
-    const users = JSON.parse(fs.readFileSync(usersFile))
-    const user = users.find(u=>u.username===username && u.password===password)
+    if(!fs.existsSync(dir)) return res.json([])
 
-    if(user){
-        return res.json({msg:"login ok"})
-    }
+    const items = fs.readdirSync(dir)
 
-    res.json({msg:"invalid"})
-})
-
-// ===== FOLDER =====
-app.post("/mkdir", (req,res)=>{
-    const { name } = req.body
-    const dir = path.join("uploads", name)
-
-    if(!fs.existsSync(dir)){
-        fs.mkdirSync(dir, { recursive:true })
-        return res.json({msg:"folder created"})
-    }
-
-    res.json({msg:"folder exists"})
-})
-
-// ===== UPLOAD =====
-app.post("/upload", upload.single("file"), (req,res)=>{
-    const user = req.body.user
-
-    if(!user){
-        return res.json({msg:"no user"})
-    }
-
-    const userDir = path.join("uploads", user)
-
-    if(!fs.existsSync(userDir)){
-        fs.mkdirSync(userDir)
-    }
-
-    let fileName = req.file.originalname
-    let destPath = path.join(userDir, fileName)
-
-    // stop duplicates
-    if(fs.existsSync(destPath)){
-        const time = Date.now()
-        fileName = time + "_" + fileName
-        destPath = path.join(userDir, fileName)
-    }
-
-    fs.renameSync(req.file.path, destPath)
-
-    res.json({msg:"uploaded"})
-})
-
-// ===== FILES =====
-app.get("/files", (req,res)=>{
-    const user = req.query.user || ""
-    const dirPath = path.join("uploads", user)
-
-    if(!fs.existsSync(dirPath)){
-        return res.json([])
-    }
-
-    const items = fs.readdirSync(dirPath, { withFileTypes: true })
-
-    const result = items.map(i=>{
-        const fullPath = path.join(dirPath, i.name)
-        const stats = fs.statSync(fullPath)
-
-        return {
-            name: i.name,
-            size: stats.size,
-            date: stats.mtime
-        }
+    const result = items.map(name=>{
+        const stat = fs.statSync(path.join(dir,name))
+        return { name, size: stat.size }
     })
 
     res.json(result)
 })
 
-// delete
-app.delete("/delete/:name", (req,res)=>{
-    const user = req.query.user || ""
-    const filePath = path.join("uploads", user, req.params.name)
+app.post("/mkdir",(req,res)=>{
+    const { user,name } = req.body
+    const dir = path.join(userDir(user),name)
 
-    if(fs.existsSync(filePath)){
-        fs.rmSync(filePath, { recursive:true, force:true })
-        return res.json({msg:"deleted"})
+    if(fs.existsSync(dir)) return res.json({msg:"exists"})
+
+    fs.mkdirSync(dir,{recursive:true})
+    res.json({msg:"created"})
+})
+
+app.delete("/delete",(req,res)=>{
+    const { user,name } = req.body
+    const file = path.join(userDir(user),name)
+
+    if(!fs.existsSync(file)) return res.json({msg:"not found"})
+
+    fs.rmSync(file)
+    res.json({msg:"deleted"})
+})
+
+app.post("/upload", upload.single("file"), (req,res)=>{
+    const { user, overwrite } = req.body
+
+    const dir = userDir(user)
+    if(!fs.existsSync(dir)) fs.mkdirSync(dir)
+
+    const dest = path.join(dir, req.file.originalname)
+
+    if(fs.existsSync(dest) && overwrite !== "true"){
+        fs.unlinkSync(req.file.path)
+        return res.json({msg:"duplicate"})
+    }
+
+    fs.renameSync(req.file.path, dest)
+    res.json({msg:"uploaded"})
+})
+
+app.get("/download",(req,res)=>{
+    const { user,name } = req.query
+    const file = path.join(userDir(user),name)
+
+    if(fs.existsSync(file)){
+        return res.download(file)
     }
 
     res.json({msg:"not found"})
 })
 
-// download
-app.get("/download/:name", (req,res)=>{
-    const user = req.query.user || ""
-    const filePath = path.join(__dirname, "uploads", user, req.params.name)
-
-    if(fs.existsSync(filePath)){
-        return res.download(filePath)
-    }
-
-    res.json({msg:"not found"})
-})
-
-app.listen(3000, ()=>console.log("server running"))
+app.listen(3000,()=>console.log("server running"))
