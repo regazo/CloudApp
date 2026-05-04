@@ -1,8 +1,8 @@
+//zakarea erezzaghi 3074880
 <!DOCTYPE html>
 <html>
 <head>
     <title>cloud app</title>
-
     <style>
         body{
             font-family: Arial;
@@ -15,7 +15,11 @@
             justify-content:center;
             align-items:center;
         }
-
+#currentUser{
+    margin-bottom:15px;
+    color:#bbb;
+    font-size:14px;
+}
         .box{
             background:#1f1b2e;
             padding:30px;
@@ -103,7 +107,7 @@
 <div class="box">
 
     <h1>Cloud Storage</h1>
-
+<div id="currentUser" style="margin-bottom:15px; color:#ccc;"></div>
     <!-- Status + Buttons -->
     <div class="topbar">
         <div id="msg" class="msg"></div>
@@ -126,7 +130,7 @@
     <!-- Upload -->
     <div class="section">
         <div class="row">
-            <input type="file" id="fileInput">
+     <input type="file" id="fileInput">
             <button onclick="uploadFile()">upload</button>
         </div>
     </div>

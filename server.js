@@ -1,3 +1,4 @@
+//zakarea erezzaghi 3074880
 import express from "express"
 import multer from "multer"
 import fs from "fs"
@@ -13,39 +14,102 @@ app.use(express.static("public"))
 
 const upload = multer({ dest: "uploads/" })
 
+// make uploads folder
 if (!fs.existsSync("uploads")) {
     fs.mkdirSync("uploads")
 }
 
-// create folder
+// ===== USERS =====
+const usersFile = "users.json"
+
+if (!fs.existsSync(usersFile)) {
+    fs.writeFileSync(usersFile, JSON.stringify([]))
+}
+
+// register
+app.post("/register", (req,res)=>{
+    const { username, password } = req.body
+
+    if(!username || !password){
+        return res.json({msg:"missing fields"})
+    }
+
+    const users = JSON.parse(fs.readFileSync(usersFile))
+
+    if(users.find(u=>u.username===username)){
+        return res.json({msg:"user exists"})
+    }
+
+    users.push({username,password})
+    fs.writeFileSync(usersFile, JSON.stringify(users))
+
+    res.json({msg:"registered"})
+})
+
+// login
+app.post("/login", (req,res)=>{
+    const { username, password } = req.body
+
+    const users = JSON.parse(fs.readFileSync(usersFile))
+    const user = users.find(u=>u.username===username && u.password===password)
+
+    if(user){
+        return res.json({msg:"login ok"})
+    }
+
+    res.json({msg:"invalid"})
+})
+
+// ===== FOLDER =====
 app.post("/mkdir", (req,res)=>{
     const { name } = req.body
     const dir = path.join("uploads", name)
 
     if(!fs.existsSync(dir)){
-        fs.mkdirSync(dir)
+        fs.mkdirSync(dir, { recursive:true })
         return res.json({msg:"folder created"})
     }
 
     res.json({msg:"folder exists"})
 })
 
-// upload
+// ===== UPLOAD =====
 app.post("/upload", upload.single("file"), (req,res)=>{
-    const folder = req.body.folder || ""
-    const file = req.file
+    const user = req.body.user
 
-    const destPath = path.join("uploads", folder, file.originalname)
+    if(!user){
+        return res.json({msg:"no user"})
+    }
 
-    fs.renameSync(file.path, destPath)
+    const userDir = path.join("uploads", user)
+
+    if(!fs.existsSync(userDir)){
+        fs.mkdirSync(userDir)
+    }
+
+    let fileName = req.file.originalname
+    let destPath = path.join(userDir, fileName)
+
+    // stop duplicates
+    if(fs.existsSync(destPath)){
+        const time = Date.now()
+        fileName = time + "_" + fileName
+        destPath = path.join(userDir, fileName)
+    }
+
+    fs.renameSync(req.file.path, destPath)
 
     res.json({msg:"uploaded"})
 })
 
-// Files with metadaata
+// ===== FILES =====
 app.get("/files", (req,res)=>{
-    const folder = req.query.folder || ""
-    const dirPath = path.join("uploads", folder)
+    const user = req.query.user || ""
+    const dirPath = path.join("uploads", user)
+
+    if(!fs.existsSync(dirPath)){
+        return res.json([])
+    }
 
     const items = fs.readdirSync(dirPath, { withFileTypes: true })
 
@@ -55,7 +119,6 @@ app.get("/files", (req,res)=>{
 
         return {
             name: i.name,
-            isFolder: i.isDirectory(),
             size: stats.size,
             date: stats.mtime
         }
@@ -66,8 +129,8 @@ app.get("/files", (req,res)=>{
 
 // delete
 app.delete("/delete/:name", (req,res)=>{
-    const folder = req.query.folder || ""
-    const filePath = path.join("uploads", folder, req.params.name)
+    const user = req.query.user || ""
+    const filePath = path.join("uploads", user, req.params.name)
 
     if(fs.existsSync(filePath)){
         fs.rmSync(filePath, { recursive:true, force:true })
@@ -79,8 +142,8 @@ app.delete("/delete/:name", (req,res)=>{
 
 // download
 app.get("/download/:name", (req,res)=>{
-    const folder = req.query.folder || ""
-    const filePath = path.join(__dirname, "uploads", folder, req.params.name)
+    const user = req.query.user || ""
+    const filePath = path.join(__dirname, "uploads", user, req.params.name)
 
     if(fs.existsSync(filePath)){
         return res.download(filePath)
