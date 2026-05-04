@@ -1,83 +1,19 @@
-let user=null
-let path="/"
-
-async function login(){
- user=await window.login()
-
- await fetch("/login",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({uid:user.uid,email:user.email})
- })
-
- load()
-}
-
-function logout(){window.logout()}
-
-async function mkdir(){
- const name=document.getElementById("dirname").value
-
- await fetch("/mkdir",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({userId:user.uid,name,path})
- })
-
- load()
-}
-
-async function upload(){
- const file=document.getElementById("file").files[0]
-
- let form=new FormData()
- form.append("file",file)
- form.append("userId",user.uid)
- form.append("path",path)
-
- await fetch("/upload",{method:"POST",body:form})
- load()
-}
-
-async function load(){
- const res=await fetch("/list",{
-  method:"POST",
-  headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({userId:user.uid,path})
- })
-
- const data=await res.json()
- const list=document.getElementById("list")
- list.innerHTML=""
-
- data.dirs.forEach(d=>{
-  let li=document.createElement("li")
-  li.innerText="[DIR] "+d.name
-  li.onclick=()=>{path=d.path;load()}
-  list.appendChild(li)
- })
-
- data.files.forEach(f=>{
-  let li=document.createElement("li")
-  li.innerText=f.filename
-  list.appendChild(li)
- })
-}
+// upload file
 async function uploadFile(){
     const fileInput = document.getElementById('fileInput')
     const file = fileInput.files[0]
 
     if(!file){
-        setMsg('no file selected')
+        setMsg('no file')
         return
     }
 
     const formData = new FormData()
     formData.append('file', file)
 
-    const res = await fetch('/upload', {
-        method: 'POST',
-        body: formData
+    const res = await fetch('/upload',{
+        method:'POST',
+        body:formData
     })
 
     const data = await res.json()
@@ -86,7 +22,7 @@ async function uploadFile(){
     loadFiles()
 }
 
-// load files
+// get files
 async function loadFiles(){
     const res = await fetch('/files')
     const files = await res.json()
@@ -103,28 +39,58 @@ async function loadFiles(){
 
 // delete file
 async function del(name){
-    await fetch('/delete/' + name, { method:'DELETE' })
-    setMsg('deleted file')
+    await fetch('/delete/'+name,{method:'DELETE'})
+    setMsg('deleted')
     loadFiles()
 }
 
-// fake login (simple)
-function login(){
-    setMsg('logged in')
+// login user (real now)
+async function login(){
+    const username = prompt('enter user')
+    const password = prompt('enter pass')
+
+    const res = await fetch('/login',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({username,password})
+    })
+
+    const data = await res.json()
+    setMsg(data.msg)
+
+    if(data.msg === 'login ok'){
+        localStorage.setItem('user',username) // save user
+    }
 }
 
-// fake logout
+// register user
+async function register(){
+    const username = prompt('new user')
+    const password = prompt('new pass')
+
+    const res = await fetch('/register',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({username,password})
+    })
+
+    const data = await res.json()
+    setMsg(data.msg)
+}
+
+// logout
 function logout(){
+    localStorage.removeItem('user')
     setMsg('logged out')
 }
 
-// folder (just visual rn)
+// fake folder (not saved yet)
 function makeFolder(){
     const name = document.getElementById('folderName').value
-    setMsg('folder "' + name + '" created')
+    setMsg('folder "'+name+'" made')
 }
 
-// msg helper
+// msg helper (just prints text)
 function setMsg(text){
     document.getElementById('msg').innerText = text
 }
