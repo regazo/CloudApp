@@ -1,6 +1,8 @@
 let currentUser = localStorage.getItem("user")
+let currentFolder = ""
 
 updateUI()
+loadFiles()
 
 function login(){
     const user = prompt("enter username")
@@ -26,6 +28,7 @@ function register(){
 function logout(){
     currentUser = null
     localStorage.removeItem("user")
+    currentFolder = ""
 
     updateUI()
     document.getElementById("files").innerHTML = ""
@@ -35,33 +38,32 @@ function updateUI(){
     const msg = document.getElementById("msg")
 
     if(currentUser){
-        msg.innerText = "logged in as: " + currentUser
+        msg.innerText = "user: " + currentUser + " | folder: " + (currentFolder || "root")
     }else{
         msg.innerText = "not logged in"
     }
 }
 
+// create folder
 async function makeFolder(){
-    if(!currentUser) return alert("login first")
-
     const name = document.getElementById("folderName").value
 
     await fetch("/mkdir", {
         method:"POST",
         headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({ name, user: currentUser })
+        body: JSON.stringify({ name })
     })
 
     loadFiles()
 }
 
+// upload
 async function uploadFile(){
-    if(!currentUser) return alert("login first")
-
     const file = document.getElementById("fileInput").files[0]
+
     const formData = new FormData()
     formData.append("file", file)
-    formData.append("user", currentUser)
+    formData.append("folder", currentFolder)
 
     await fetch("/upload", {
         method:"POST",
@@ -71,28 +73,63 @@ async function uploadFile(){
     loadFiles()
 }
 
+// load files
 async function loadFiles(){
-    if(!currentUser) return
-
-    const res = await fetch("/files?user=" + currentUser)
-    const files = await res.json()
+    const res = await fetch("/files?folder=" + currentFolder)
+    const items = await res.json()
 
     const div = document.getElementById("files")
     div.innerHTML = ""
 
-    files.forEach(f=>{
+    // back button
+    if(currentFolder){
+        const back = document.createElement("div")
+        back.innerHTML = `<button onclick="goBack()">⬅ back</button>`
+        div.appendChild(back)
+    }
+
+    items.forEach(i=>{
         const el = document.createElement("div")
 
-        el.innerHTML = `
-            ${f.name}
-            <button onclick="deleteFile('${f.name}')">delete</button>
-        `
+        if(i.isFolder){
+            el.innerHTML = `📁 ${i.name} 
+            <button onclick="openFolder('${i.name}')">open</button>`
+        }else{
+            el.innerHTML = `📄 ${i.name} 
+            <button onclick="downloadFile('${i.name}')">download</button>
+            <button onclick="deleteFile('${i.name}')">delete</button>`
+        }
 
         div.appendChild(el)
     })
 }
 
-async function deleteFile(name){
-    await fetch("/delete/" + name, { method:"DELETE" })
+// open folder
+function openFolder(name){
+    currentFolder = currentFolder ? currentFolder + "/" + name : name
     loadFiles()
+    updateUI()
+}
+
+// go back
+function goBack(){
+    const parts = currentFolder.split("/")
+    parts.pop()
+    currentFolder = parts.join("/")
+    loadFiles()
+    updateUI()
+}
+
+// delete
+async function deleteFile(name){
+    await fetch("/delete/" + name + "?folder=" + currentFolder, {
+        method:"DELETE"
+    })
+
+    loadFiles()
+}
+
+// download
+function downloadFile(name){
+    window.open("/download/" + name + "?folder=" + currentFolder)
 }
